@@ -37,6 +37,14 @@ async def _post(path: str, body: dict) -> dict:
         return resp.json()
 
 
+async def _delete(path: str, params: Optional[dict] = None) -> dict:
+    """DELETE request to OpenViking API."""
+    async with httpx.AsyncClient(base_url=OPENVIKING_URL, timeout=30.0) as client:
+        resp = await client.delete(f"/api/v1{path}", params=params)
+        resp.raise_for_status()
+        return resp.json()
+
+
 def _format_error(e: Exception) -> str:
     if isinstance(e, httpx.ConnectError):
         return f"OpenViking server is not running at {OPENVIKING_URL}. Start it first."
@@ -152,6 +160,23 @@ async def viking_overview(uri: str) -> str:
     except Exception as e:
         return _format_error(e)
     return data.get("result", "")
+
+
+@server.tool()
+async def viking_delete(uri: str) -> str:
+    """リソースを削除する。旧バージョンの整理に使う。
+
+    viking_lsで一覧を確認してから、不要なURIを指定して削除する。
+    削除は不可逆なので注意。
+    """
+    try:
+        data = await _delete("/fs", {"uri": uri, "recursive": True})
+    except Exception as e:
+        return _format_error(e)
+
+    result = data.get("result", {})
+    deleted_uri = result.get("uri", uri)
+    return f"Deleted: {deleted_uri}"
 
 
 @server.tool()
